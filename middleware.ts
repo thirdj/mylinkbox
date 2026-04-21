@@ -6,7 +6,11 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // 인증 불필요한 경로
-  if (pathname.startsWith('/auth') || pathname.startsWith('/api')) {
+  if (
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/api') ||
+    pathname.startsWith('/shared')
+  ) {
     return res
   }
 
@@ -26,7 +30,6 @@ export async function middleware(req: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-
   if (!user && pathname !== '/auth') {
     return NextResponse.redirect(new URL('/auth', req.url))
   }
@@ -35,5 +38,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|favicon.svg).*)'],
 }

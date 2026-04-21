@@ -1,5 +1,6 @@
 export type LinkStatus = 'wish' | 'bought' | 'archived'
 export type ViewMode = 'grid2' | 'grid3' | 'list'
+export type SortMode = 'newest' | 'oldest' | 'price_asc' | 'price_desc' | 'site'
 
 export interface LinkItem {
   id: string
@@ -11,6 +12,8 @@ export interface LinkItem {
   site_name: string | null
   favicon: string | null
   price: string | null
+  last_price: string | null
+  price_updated_at: string | null
   category: string
   status: LinkStatus
   memo: string | null
@@ -33,4 +36,12 @@ export interface OGData {
   site_name: string | null
   favicon: string | null
   needsManualEdit?: boolean
+}
+
+export interface PriceHistory {
+  id: string
+  link_id: string
+  old_price: string | null
+  new_price: string | null
+  changed_at: string
 }
