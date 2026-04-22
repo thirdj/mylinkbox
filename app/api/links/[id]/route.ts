@@ -12,7 +12,6 @@ export async function PATCH(
   const { id } = await params
   const body = await req.json()
 
-  // 기존 링크 조회 (가격 변동 감지용)
   const { data: existing } = await supabase
     .from('links')
     .select('price, title')
@@ -21,15 +20,13 @@ export async function PATCH(
     .single()
 
   const oldPrice = existing?.price || null
-  const newPrice = body.price || null
-  const priceChanged = oldPrice !== newPrice && (oldPrice || newPrice)
+  const newPrice = body.price !== undefined ? (body.price || null) : oldPrice
+  const priceChanged = body.price !== undefined && oldPrice !== newPrice && (oldPrice || newPrice)
 
-  const updateData: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-  }
+  const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (body.title !== undefined) updateData.title = body.title
   if (body.price !== undefined) {
-    updateData.price = body.price
+    updateData.price = body.price || null
     if (priceChanged) {
       updateData.last_price = oldPrice
       updateData.price_updated_at = new Date().toISOString()
@@ -38,6 +35,8 @@ export async function PATCH(
   if (body.category !== undefined) updateData.category = body.category
   if (body.status !== undefined) updateData.status = body.status
   if (body.memo !== undefined) updateData.memo = body.memo
+  if (body.tags !== undefined) updateData.tags = body.tags
+  if (body.is_favorite !== undefined) updateData.is_favorite = body.is_favorite
 
   const { data, error } = await supabase
     .from('links')
@@ -49,7 +48,6 @@ export async function PATCH(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // 가격 변동 히스토리 기록
   if (priceChanged) {
     await supabase.from('price_history').insert({
       link_id: id,

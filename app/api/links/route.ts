@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 
-// GET /api/links - 링크 목록 조회
 export async function GET(req: NextRequest) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -15,6 +14,7 @@ export async function GET(req: NextRequest) {
     .from('links')
     .select('*')
     .eq('user_id', user.id)
+    .order('is_favorite', { ascending: false })
     .order('created_at', { ascending: false })
 
   if (status && status !== 'all') query = query.eq('status', status)
@@ -25,7 +25,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(data)
 }
 
-// POST /api/links - 링크 저장
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -33,7 +32,6 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
 
-  // 중복 URL 체크
   const { data: existing } = await supabase
     .from('links')
     .select('id, title')
@@ -42,10 +40,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (existing) {
-    return NextResponse.json(
-      { error: 'DUPLICATE', existing },
-      { status: 409 }
-    )
+    return NextResponse.json({ error: 'DUPLICATE', existing }, { status: 409 })
   }
 
   const { data, error } = await supabase
@@ -60,6 +55,8 @@ export async function POST(req: NextRequest) {
       favicon: body.favicon,
       price: body.price || null,
       category: body.category || '기타',
+      tags: body.tags || [],
+      is_favorite: false,
       status: 'wish',
       memo: null,
     })

@@ -15,6 +15,8 @@ export interface LinkItem {
   last_price: string | null
   price_updated_at: string | null
   category: string
+  tags: string[]
+  is_favorite: boolean
   status: LinkStatus
   memo: string | null
   created_at: string
