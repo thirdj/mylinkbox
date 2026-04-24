@@ -323,15 +323,14 @@ export default function DashboardPage() {
             </div>
 
             {/* 무한스크롤 sentinel */}
-            <div ref={sentinelRef} className="h-10 mt-4 flex items-center justify-center">
-              {loadingMore && (
-                <div className={gridClass + ' w-full'}>
-                  {Array.from({ length: view === 'list' ? 2 : 4 }).map((_, i) => (
-                    <SkeletonCard key={i} view={view} />
-                  ))}
-                </div>
-              )}
-            </div>
+            <div ref={sentinelRef} className="h-4 mt-2" />
+            {loadingMore && (
+              <div className={gridClass + ' mt-3'}>
+                {Array.from({ length: view === 'list' ? 2 : 4 }).map((_, i) => (
+                  <SkeletonCard key={i} view={view} />
+                ))}
+              </div>
+            )}
           </>
         )}
       </main>
