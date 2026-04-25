@@ -1,10 +1,9 @@
 'use client'
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { LinkItem, ViewMode, SortMode, FilterMode, Category } from '@/types'
 import AddLinkBar from '@/components/AddLinkBar'
 import LinkCard from '@/components/LinkCard'
-import SkeletonCard from '@/components/SkeletonCard'
 import Toolbar from '@/components/Toolbar'
 import EditModal from '@/components/EditModal'
 import PriceHistoryModal from '@/components/PriceHistoryModal'
@@ -12,21 +11,21 @@ import SearchBar from '@/components/SearchBar'
 import ShareButton from '@/components/ShareButton'
 import ImportExportModal from '@/components/ImportExportModal'
 import PriceAlertBell from '@/components/PriceAlertBell'
-import { Plus, X, MoreVertical, LogOut } from 'lucide-react'
+import { Plus, X, MoreVertical, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 
 function parsePrice(p: string | null): number {
   if (!p) return 0
   return parseInt(p.replace(/[^0-9]/g, '')) || 0
 }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 30
 
 export default function DashboardPage() {
   const supabase = createClient()
   const [items, setItems] = useState<LinkItem[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
+  const [totalPages, setTotalPages] = useState(1)
   const [view, setView] = useState<ViewMode>('grid2')
   const [filter, setFilter] = useState<FilterMode>('all')
   const [sort, setSort] = useState<SortMode>('newest')
@@ -34,38 +33,16 @@ export default function DashboardPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [editItem, setEditItem] = useState<LinkItem | null>(null)
   const [priceHistoryItem, setPriceHistoryItem] = useState<{ id: string; title: string } | null>(null)
-  const [initialLoading, setInitialLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showImportExport, setShowImportExport] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showAddLink, setShowAddLink] = useState(false)
-  const observerRef = useRef<IntersectionObserver | null>(null)
-  const sentinelRef = useRef<HTMLDivElement | null>(null)
-
-  // auth 최적화 - 캐시된 세션 먼저 사용
-  useEffect(() => {
-    const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { window.location.href = '/auth'; return }
-
-      // 병렬로 데이터 패치
-      await Promise.all([
-        fetchPage(1, filter, categoryFilter, true),
-        fetchCategories(),
-      ])
-      setInitialLoading(false)
-    }
-    init()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const fetchPage = useCallback(async (
-    p: number,
-    f: FilterMode,
-    cat: string,
-    reset: boolean
+    p: number, f: FilterMode, cat: string
   ) => {
+    setLoading(true)
     const params = new URLSearchParams({
       page: String(p),
       limit: String(PAGE_SIZE),
@@ -74,13 +51,14 @@ export default function DashboardPage() {
     if (cat !== '전체') params.set('category', cat)
 
     const res = await fetch(`/api/links?${params}`)
-    if (!res.ok) return
-    const data = await res.json()
-
-    setItems(prev => reset ? data.items : [...prev, ...data.items])
-    setTotal(data.total)
-    setHasMore(data.hasMore)
-    setPage(p)
+    if (res.ok) {
+      const data = await res.json()
+      setItems(data.items)
+      setTotal(data.total)
+      setTotalPages(Math.ceil(data.total / PAGE_SIZE) || 1)
+      setPage(p)
+    }
+    setLoading(false)
   }, [])
 
   const fetchCategories = useCallback(async () => {
@@ -91,31 +69,30 @@ export default function DashboardPage() {
     }
   }, [])
 
-  // 필터 변경 시 리셋
+  useEffect(() => {
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { window.location.href = '/auth'; return }
+      await Promise.all([fetchPage(1, 'all', '전체'), fetchCategories()])
+    }
+    init()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleFilterChange = useCallback((f: FilterMode) => {
     setFilter(f)
-    setInitialLoading(true)
-    fetchPage(1, f, categoryFilter, true).then(() => setInitialLoading(false))
+    fetchPage(1, f, categoryFilter)
   }, [categoryFilter, fetchPage])
 
   const handleCategoryChange = useCallback((cat: string) => {
     setCategoryFilter(cat)
-    setInitialLoading(true)
-    fetchPage(1, filter, cat, true).then(() => setInitialLoading(false))
+    fetchPage(1, filter, cat)
   }, [filter, fetchPage])
 
-  // Infinite scroll
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect()
-    observerRef.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore && !loadingMore) {
-        setLoadingMore(true)
-        fetchPage(page + 1, filter, categoryFilter, false).then(() => setLoadingMore(false))
-      }
-    }, { threshold: 0.1 })
-    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current)
-    return () => observerRef.current?.disconnect()
-  }, [hasMore, loadingMore, page, filter, categoryFilter, fetchPage])
+  const handlePageChange = (p: number) => {
+    fetchPage(p, filter, categoryFilter)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const handleAdd = async (linkData: Omit<LinkItem, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     const res = await fetch('/api/links', {
@@ -125,9 +102,8 @@ export default function DashboardPage() {
     })
     if (res.status === 409) return { duplicate: true }
     if (res.ok) {
-      const newItem = await res.json()
-      setItems(prev => [newItem, ...prev])
-      setTotal(t => t + 1)
+      // 첫 페이지로 리셋해서 새 항목 보이게
+      fetchPage(1, filter, categoryFilter)
     }
     return {}
   }
@@ -148,8 +124,9 @@ export default function DashboardPage() {
     if (!confirm('삭제하시겠습니까?')) return
     const res = await fetch(`/api/links/${id}`, { method: 'DELETE' })
     if (res.ok) {
-      setItems(prev => prev.filter(i => i.id !== id))
-      setTotal(t => t - 1)
+      // 현재 페이지 아이템이 1개였으면 이전 페이지로
+      const targetPage = items.length === 1 && page > 1 ? page - 1 : page
+      fetchPage(targetPage, filter, categoryFilter)
     }
   }
 
@@ -185,7 +162,6 @@ export default function DashboardPage() {
 
   const categoryNames = categories.map(c => c.name)
 
-  // 클라이언트 정렬 + 검색
   const displayed = useMemo(() => {
     let list = [...items]
     if (search.trim()) {
@@ -219,7 +195,15 @@ export default function DashboardPage() {
     view === 'grid3' ? 'grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2' :
     'flex flex-col gap-2'
 
-  const skeletonCount = view === 'list' ? 5 : view === 'grid3' ? 9 : 6
+  // 페이지 번호 배열 생성 (최대 5개 표시)
+  const pageNumbers = useMemo(() => {
+    const delta = 2
+    const range: number[] = []
+    const left = Math.max(1, page - delta)
+    const right = Math.min(totalPages, page + delta)
+    for (let i = left; i <= right; i++) range.push(i)
+    return range
+  }, [page, totalPages])
 
   return (
     <div className="min-h-screen bg-gray-50 pb-28">
@@ -282,7 +266,8 @@ export default function DashboardPage() {
               )}
             </div>
           ))}
-          <button onClick={handleAddCategory} className="flex-shrink-0 text-xs h-7 px-3 rounded-full border border-dashed border-gray-300 text-gray-400 hover:border-gray-400 whitespace-nowrap flex items-center gap-1">
+          <button onClick={handleAddCategory}
+            className="flex-shrink-0 text-xs h-7 px-3 rounded-full border border-dashed border-gray-300 text-gray-400 hover:border-gray-400 whitespace-nowrap flex items-center gap-1">
             <Plus size={10} /> 추가
           </button>
         </div>
@@ -294,11 +279,9 @@ export default function DashboardPage() {
         />
 
         {/* 아이템 목록 */}
-        {initialLoading ? (
-          <div className={gridClass}>
-            {Array.from({ length: skeletonCount }).map((_, i) => (
-              <SkeletonCard key={i} view={view} />
-            ))}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : displayed.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
@@ -322,14 +305,73 @@ export default function DashboardPage() {
               ))}
             </div>
 
-            {/* 무한스크롤 sentinel */}
-            <div ref={sentinelRef} className="h-4 mt-2" />
-            {loadingMore && (
-              <div className={gridClass + ' mt-3'}>
-                {Array.from({ length: view === 'list' ? 2 : 4 }).map((_, i) => (
-                  <SkeletonCard key={i} view={view} />
+            {/* 페이지네이션 */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-1.5 mt-8 mb-4">
+                {/* 이전 */}
+                <button
+                  onClick={() => handlePageChange(page - 1)}
+                  disabled={page === 1}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+
+                {/* 첫 페이지 */}
+                {pageNumbers[0] > 1 && (
+                  <>
+                    <button onClick={() => handlePageChange(1)}
+                      className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-sm text-gray-600 hover:border-gray-300">
+                      1
+                    </button>
+                    {pageNumbers[0] > 2 && <span className="text-gray-400 text-sm px-1">···</span>}
+                  </>
+                )}
+
+                {/* 페이지 번호들 */}
+                {pageNumbers.map(p => (
+                  <button
+                    key={p}
+                    onClick={() => handlePageChange(p)}
+                    className={`w-9 h-9 flex items-center justify-center rounded-xl text-sm font-medium transition-all ${
+                      p === page
+                        ? 'bg-blue-600 text-white border border-blue-600 shadow-sm'
+                        : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    {p}
+                  </button>
                 ))}
+
+                {/* 마지막 페이지 */}
+                {pageNumbers[pageNumbers.length - 1] < totalPages && (
+                  <>
+                    {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && (
+                      <span className="text-gray-400 text-sm px-1">···</span>
+                    )}
+                    <button onClick={() => handlePageChange(totalPages)}
+                      className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-sm text-gray-600 hover:border-gray-300">
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+
+                {/* 다음 */}
+                <button
+                  onClick={() => handlePageChange(page + 1)}
+                  disabled={page === totalPages}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronRight size={16} />
+                </button>
               </div>
+            )}
+
+            {/* 페이지 정보 */}
+            {totalPages > 1 && (
+              <p className="text-center text-xs text-gray-400 mb-4">
+                {page} / {totalPages} 페이지 · 총 {total}개
+              </p>
             )}
           </>
         )}
@@ -369,7 +411,7 @@ export default function DashboardPage() {
       {showImportExport && (
         <ImportExportModal
           onClose={() => setShowImportExport(false)}
-          onImportDone={() => fetchPage(1, filter, categoryFilter, true)}
+          onImportDone={() => fetchPage(1, filter, categoryFilter)}
         />
       )}
     </div>
