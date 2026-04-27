@@ -27,7 +27,7 @@ export default function LinkCard({ item, view, onEdit, onDelete, onPriceHistory,
   // ── 리스트 뷰 ──
   if (view === 'list') {
     return (
-      <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-2.5 hover:border-gray-200 transition-colors">
+      <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-2.5 hover:border-gray-200 transition-colors group">
         {/* 썸네일 */}
         <div className="w-12 h-12 rounded-lg bg-gray-50 flex-shrink-0 overflow-hidden flex items-center justify-center">
           {item.thumbnail
@@ -67,18 +67,22 @@ export default function LinkCard({ item, view, onEdit, onDelete, onPriceHistory,
           </div>
         </div>
 
-        {/* 버튼 3개 — 오른쪽 끝 고정 */}
+        {/* 버튼 3개 — 오른쪽 끝, 호버 시에만 표시 (즐겨찾기는 활성화 시 항상 표시) */}
         <div className="flex items-center gap-0.5 flex-shrink-0">
           <button
             onClick={() => onToggleFavorite(item.id, !item.is_favorite)}
-            className={`p-1.5 rounded-lg transition-colors ${item.is_favorite ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'}`}
+            className={`p-1.5 rounded-lg transition-colors ${
+              item.is_favorite
+                ? 'text-yellow-400'
+                : 'text-gray-300 opacity-0 group-hover:opacity-100'
+            }`}
           >
             <Star size={14} fill={item.is_favorite ? 'currentColor' : 'none'} />
           </button>
-          <button onClick={() => onEdit(item)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-300 hover:text-gray-500">
+          <button onClick={() => onEdit(item)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
             <Pencil size={14} />
           </button>
-          <button onClick={() => onDelete(item.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400">
+          <button onClick={() => onDelete(item.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
             <Trash2 size={14} />
           </button>
         </div>
