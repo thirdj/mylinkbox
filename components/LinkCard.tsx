@@ -115,11 +115,24 @@ export default function LinkCard({ item, view, onEdit, onDelete, onPriceHistory,
           <span className="text-[10px] text-gray-400 truncate">{item.site_name || getSiteLabel(item.url)}</span>
         </div>
 
-        {/* 제목 - 최대 2줄 */}
-        <a href={item.url} target="_blank" rel="noopener noreferrer"
-          className="text-sm font-semibold text-gray-900 leading-snug mb-2 line-clamp-2 hover:text-blue-600 transition-colors block flex-1">
-          {item.title}
-        </a>
+        {/* 제목 - flex-1 제거하고 고정 높이로 말줄임 보장 */}
+        <div className="mb-2" style={{ minHeight: '2.6rem' }}>
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-semibold text-gray-900 hover:text-blue-600 transition-colors"
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              lineHeight: '1.3rem',
+            }}
+          >
+            {item.title}
+          </a>
+        </div>
 
         {/* 가격 */}
         {displayPrice ? (

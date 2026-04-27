@@ -10,33 +10,57 @@ export async function GET(req: NextRequest) {
   const category = searchParams.get('category')
   const filter = searchParams.get('filter') || 'all'
   const page = parseInt(searchParams.get('page') || '1')
-  const limit = parseInt(searchParams.get('limit') || '20')
+  const limit = parseInt(searchParams.get('limit') || '30')
   const offset = (page - 1) * limit
 
-  let query = supabase
+  // 데이터 쿼리와 카운트 쿼리 병렬 실행
+  let dataQuery = supabase
     .from('links')
-    .select('*', { count: 'exact' })
+    .select('id,url,title,thumbnail,favicon,site_name,price,last_price,price_updated_at,category,is_favorite,memo,created_at,updated_at')
     .eq('user_id', user.id)
 
-  if (filter === 'favorite') query = query.eq('is_favorite', true)
-  else if (filter === 'no_price') query = query.is('price', null)
+  let countQuery = supabase
+    .from('links')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
 
-  if (category && category !== '전체') query = query.eq('category', category)
+  if (filter === 'favorite') {
+    dataQuery = dataQuery.eq('is_favorite', true)
+    countQuery = countQuery.eq('is_favorite', true)
+  } else if (filter === 'no_price') {
+    dataQuery = dataQuery.is('price', null)
+    countQuery = countQuery.is('price', null)
+  }
 
-  query = query
+  if (category && category !== '전체') {
+    dataQuery = dataQuery.eq('category', category)
+    countQuery = countQuery.eq('category', category)
+  }
+
+  dataQuery = dataQuery
     .order('is_favorite', { ascending: false })
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
-  const { data, error, count } = await query
+  // 병렬 실행으로 속도 향상
+  const [{ data, error }, { count }] = await Promise.all([
+    dataQuery,
+    countQuery,
+  ])
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({
+  const total = count || 0
+  const res = NextResponse.json({
     items: data || [],
-    total: count || 0,
+    total,
     page,
-    hasMore: (offset + limit) < (count || 0),
+    hasMore: (offset + limit) < total,
   })
+
+  // 브라우저 캐시 방지 (항상 최신 데이터)
+  res.headers.set('Cache-Control', 'no-store')
+  return res
 }
 
 export async function POST(req: NextRequest) {

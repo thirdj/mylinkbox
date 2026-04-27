@@ -20,6 +20,31 @@ function parsePrice(p: string | null): number {
 
 const PAGE_SIZE = 30
 
+// 카드 스켈레톤
+function CardSkeleton({ view }: { view: ViewMode }) {
+  if (view === 'list') {
+    return (
+      <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-3 animate-pulse">
+        <div className="w-14 h-14 rounded-xl bg-gray-200 flex-shrink-0" />
+        <div className="flex-1 space-y-2">
+          <div className="h-3.5 bg-gray-200 rounded-full w-3/4" />
+          <div className="h-3 bg-gray-100 rounded-full w-1/2" />
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden animate-pulse">
+      <div className="aspect-[4/3] bg-gray-200" />
+      <div className="p-3 space-y-2">
+        <div className="h-2.5 bg-gray-100 rounded-full w-1/3" />
+        <div className="h-3.5 bg-gray-200 rounded-full w-full" />
+        <div className="h-3.5 bg-gray-200 rounded-full w-4/5" />
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const supabase = createClient()
   const [items, setItems] = useState<LinkItem[]>([])
@@ -38,10 +63,9 @@ export default function DashboardPage() {
   const [showImportExport, setShowImportExport] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showAddLink, setShowAddLink] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
 
-  const fetchPage = useCallback(async (
-    p: number, f: FilterMode, cat: string
-  ) => {
+  const fetchPage = useCallback(async (p: number, f: FilterMode, cat: string) => {
     setLoading(true)
     const params = new URLSearchParams({
       page: String(p),
@@ -55,7 +79,7 @@ export default function DashboardPage() {
       const data = await res.json()
       setItems(data.items)
       setTotal(data.total)
-      setTotalPages(Math.ceil(data.total / PAGE_SIZE) || 1)
+      setTotalPages(Math.max(1, Math.ceil(data.total / PAGE_SIZE)))
       setPage(p)
     }
     setLoading(false)
@@ -71,9 +95,16 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const init = async () => {
+      // getSession() 은 캐시에서 바로 반환 → 빠름
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { window.location.href = '/auth'; return }
-      await Promise.all([fetchPage(1, 'all', '전체'), fetchCategories()])
+      setAuthChecked(true)
+
+      // 링크와 카테고리를 병렬로 fetch
+      await Promise.all([
+        fetchPage(1, 'all', '전체'),
+        fetchCategories(),
+      ])
     }
     init()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,10 +132,7 @@ export default function DashboardPage() {
       body: JSON.stringify(linkData),
     })
     if (res.status === 409) return { duplicate: true }
-    if (res.ok) {
-      // 첫 페이지로 리셋해서 새 항목 보이게
-      fetchPage(1, filter, categoryFilter)
-    }
+    if (res.ok) fetchPage(1, filter, categoryFilter)
     return {}
   }
 
@@ -124,7 +152,6 @@ export default function DashboardPage() {
     if (!confirm('삭제하시겠습니까?')) return
     const res = await fetch(`/api/links/${id}`, { method: 'DELETE' })
     if (res.ok) {
-      // 현재 페이지 아이템이 1개였으면 이전 페이지로
       const targetPage = items.length === 1 && page > 1 ? page - 1 : page
       fetchPage(targetPage, filter, categoryFilter)
     }
@@ -195,15 +222,25 @@ export default function DashboardPage() {
     view === 'grid3' ? 'grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2' :
     'flex flex-col gap-2'
 
-  // 페이지 번호 배열 생성 (최대 5개 표시)
+  const skeletonCount = view === 'list' ? 6 : view === 'grid3' ? 9 : 6
+
   const pageNumbers = useMemo(() => {
     const delta = 2
     const range: number[] = []
-    const left = Math.max(1, page - delta)
-    const right = Math.min(totalPages, page + delta)
-    for (let i = left; i <= right; i++) range.push(i)
+    for (let i = Math.max(1, page - delta); i <= Math.min(totalPages, page + delta); i++) {
+      range.push(i)
+    }
     return range
   }, [page, totalPages])
+
+  // auth 확인 전에는 빈 화면
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-28">
@@ -278,10 +315,12 @@ export default function DashboardPage() {
           totalCount={total} totalBudget={totalBudget}
         />
 
-        {/* 아이템 목록 */}
+        {/* 스켈레톤 or 콘텐츠 */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className={gridClass}>
+            {Array.from({ length: skeletonCount }).map((_, i) => (
+              <CardSkeleton key={i} view={view} />
+            ))}
           </div>
         ) : displayed.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
@@ -307,43 +346,29 @@ export default function DashboardPage() {
 
             {/* 페이지네이션 */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-1.5 mt-8 mb-4">
-                {/* 이전 */}
-                <button
-                  onClick={() => handlePageChange(page - 1)}
-                  disabled={page === 1}
-                  className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
+              <div className="flex items-center justify-center gap-1.5 mt-8 mb-2">
+                <button onClick={() => handlePageChange(page - 1)} disabled={page === 1}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed">
                   <ChevronLeft size={16} />
                 </button>
 
-                {/* 첫 페이지 */}
                 {pageNumbers[0] > 1 && (
                   <>
                     <button onClick={() => handlePageChange(1)}
-                      className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-sm text-gray-600 hover:border-gray-300">
-                      1
-                    </button>
+                      className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-sm text-gray-600 hover:border-gray-300">1</button>
                     {pageNumbers[0] > 2 && <span className="text-gray-400 text-sm px-1">···</span>}
                   </>
                 )}
 
-                {/* 페이지 번호들 */}
                 {pageNumbers.map(p => (
-                  <button
-                    key={p}
-                    onClick={() => handlePageChange(p)}
+                  <button key={p} onClick={() => handlePageChange(p)}
                     className={`w-9 h-9 flex items-center justify-center rounded-xl text-sm font-medium transition-all ${
-                      p === page
-                        ? 'bg-blue-600 text-white border border-blue-600 shadow-sm'
-                        : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                    }`}
-                  >
+                      p === page ? 'bg-blue-600 text-white border border-blue-600 shadow-sm' : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    }`}>
                     {p}
                   </button>
                 ))}
 
-                {/* 마지막 페이지 */}
                 {pageNumbers[pageNumbers.length - 1] < totalPages && (
                   <>
                     {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && (
@@ -356,18 +381,13 @@ export default function DashboardPage() {
                   </>
                 )}
 
-                {/* 다음 */}
-                <button
-                  onClick={() => handlePageChange(page + 1)}
-                  disabled={page === totalPages}
-                  className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
+                <button onClick={() => handlePageChange(page + 1)} disabled={page === totalPages}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed">
                   <ChevronRight size={16} />
                 </button>
               </div>
             )}
 
-            {/* 페이지 정보 */}
             {totalPages > 1 && (
               <p className="text-center text-xs text-gray-400 mb-4">
                 {page} / {totalPages} 페이지 · 총 {total}개
