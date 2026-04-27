@@ -8,7 +8,6 @@ import Toolbar from '@/components/Toolbar'
 import EditModal from '@/components/EditModal'
 import PriceHistoryModal from '@/components/PriceHistoryModal'
 import SearchBar from '@/components/SearchBar'
-import ShareButton from '@/components/ShareButton'
 import ImportExportModal from '@/components/ImportExportModal'
 import PriceAlertBell from '@/components/PriceAlertBell'
 import { Plus, X, MoreVertical, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -243,7 +242,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-28">
+    <div className="min-h-screen bg-gray-50 pb-6">
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
@@ -253,7 +252,14 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-1">
             <PriceAlertBell />
-            <ShareButton filter={filter} category={categoryFilter} />
+            {/* + 버튼 헤더에 */}
+            <button
+              onClick={() => setShowAddLink(true)}
+              className="flex items-center gap-1 px-3 h-8 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all"
+            >
+              <span className="text-lg leading-none">+</span>
+              <span className="hidden sm:inline">추가</span>
+            </button>
             <div className="relative">
               <button onClick={() => setShowMenu(v => !v)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500">
                 <MoreVertical size={16} />
@@ -396,14 +402,6 @@ export default function DashboardPage() {
           </>
         )}
       </main>
-
-      {/* 오른쪽 하단 + 버튼 */}
-      <button
-        onClick={() => setShowAddLink(true)}
-        className="fixed bottom-6 right-5 w-14 h-14 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-full shadow-2xl flex items-center justify-center text-3xl font-light transition-all z-40"
-      >
-        +
-      </button>
 
       {showAddLink && (
         <AddLinkBar
