@@ -54,37 +54,38 @@ export default function LinkCard({ item, view, onEdit, onDelete, onPriceHistory,
           >
             {item.title}
           </a>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xs text-gray-400 truncate max-w-[100px]">
-              {item.site_name || getSiteLabel(item.url)}
-            </span>
-            {displayPrice && (
-              <button onClick={onPriceHistory} className="text-xs font-bold text-blue-600 hover:underline flex-shrink-0">
-                {displayPrice}
-                {hasPriceChange && <span className="ml-0.5 text-[10px] text-green-500">↓</span>}
+          {/* 사이트명(왼쪽) + 버튼3개(오른쪽) 한 줄 */}
+          <div className="flex items-center justify-between mt-0.5">
+            {/* 왼쪽: 사이트명 + 금액 */}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs text-gray-400 truncate max-w-[80px] flex-shrink-0">
+                {item.site_name || getSiteLabel(item.url)}
+              </span>
+              {displayPrice && (
+                <button onClick={onPriceHistory} className="text-xs font-bold text-blue-600 hover:underline flex-shrink-0">
+                  {displayPrice}
+                  {hasPriceChange && <span className="ml-0.5 text-[10px] text-green-500">↓</span>}
+                </button>
+              )}
+            </div>
+            {/* 오른쪽: 버튼 3개 — 호버 시에만 */}
+            <div className="flex items-center gap-0.5 flex-shrink-0">
+              <button
+                onClick={() => onToggleFavorite(item.id, !item.is_favorite)}
+                className={`p-1 rounded-lg transition-colors ${
+                  item.is_favorite ? 'text-yellow-400' : 'text-gray-300 opacity-0 group-hover:opacity-100'
+                }`}
+              >
+                <Star size={13} fill={item.is_favorite ? 'currentColor' : 'none'} />
               </button>
-            )}
+              <button onClick={() => onEdit(item)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Pencil size={13} />
+              </button>
+              <button onClick={() => onDelete(item.id)} className="p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Trash2 size={13} />
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* 버튼 3개 — 오른쪽 끝, 호버 시에만 표시 (즐겨찾기는 활성화 시 항상 표시) */}
-        <div className="flex items-center gap-0.5 flex-shrink-0">
-          <button
-            onClick={() => onToggleFavorite(item.id, !item.is_favorite)}
-            className={`p-1.5 rounded-lg transition-colors ${
-              item.is_favorite
-                ? 'text-yellow-400'
-                : 'text-gray-300 opacity-0 group-hover:opacity-100'
-            }`}
-          >
-            <Star size={14} fill={item.is_favorite ? 'currentColor' : 'none'} />
-          </button>
-          <button onClick={() => onEdit(item)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Pencil size={14} />
-          </button>
-          <button onClick={() => onDelete(item.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Trash2 size={14} />
-          </button>
         </div>
       </div>
     )
