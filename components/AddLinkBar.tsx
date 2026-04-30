@@ -110,8 +110,8 @@ export default function AddLinkBar({ categories, onAdd, defaultOpen = false, onC
         favicon: og?.favicon ?? null,
         price: price || null,
         last_price: null, price_updated_at: null,
-        category, tags: [], is_favorite: false,
-        status: 'wish', memo: null,
+        category, is_favorite: false,
+        memo: null,
       })
       if (result.duplicate) setError('이미 저장된 링크입니다.')
       else handleClose()
